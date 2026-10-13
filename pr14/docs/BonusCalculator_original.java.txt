@@ -1,0 +1,25 @@
+// Исходная версия BonusCalculator.calculate из starter-проекта (с дефектами), сохранена для отчёта.
+public double calculate(EmployeePerformance p) {
+    if (p.getKpiPercent() < 60) {                 // D3: нет проверки null -> NullPointerException
+        return 0;
+    }
+    if (p.getRating() < 2) {                      // D4: рейтинг 2 должен лишать премии (нужно < 3)
+        return 0;
+    }
+    double rate;
+    if (p.getKpiPercent() > 80) {                 // D1: KPI ровно 80.00 попадает в 10 % вместо 20 %
+        rate = 0.20;
+    } else {
+        rate = 0.10;
+    }
+    if (p.getRating() == 5) {
+        rate += 0.05;
+    }
+    if (p.getYears() >= 3) {                      // D2: ветка >= 10 недостижима, ветеран получает +2 вместо +5
+        rate += 0.02;
+    } else if (p.getYears() >= 10) {
+        rate += 0.05;
+    }
+    return p.getSalary() * rate;                  // D5: нет округления: 333.33 * 0.12 = 39.999599999999995
+}
+// D6: конструктор EmployeePerformance не проверял значения — отрицательный оклад давал отрицательную премию.

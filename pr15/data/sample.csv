@@ -1,0 +1,11 @@
+channel;recipient;message
+EMAIL;ivanov@corp.ru;Ваша заявка согласована
+EMAIL;ivanov.corp.ru;Ваша заявка согласована
+SMS;+79161234567;Код подтверждения 4821
+SMS;89161234567;Код подтверждения 4821
+INTERNAL;a.petrova;Совещание перенесено на 15:00
+INTERNAL;Петрова;Совещание перенесено
+PUSH;f3K9x2Lm8Qa7;Новая задача в трекере
+PUSH;abc123;Новая задача
+FAX;12345;Документ
+EMAIL;ivanov@corp.ru;
