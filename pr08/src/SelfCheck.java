@@ -39,7 +39,7 @@ public class SelfCheck {
         expectArg("submit без назначения", empty::submit);
         check("после ошибки статус остался DRAFT", empty.getStatus() == TripStatus.DRAFT);
 
-        // причина отклонения: граница 10 символов (вариант 1)
+        // причина отклонения: граница 10 символов
         expectArg("причина 9 символов", () -> submitted().reject("123456789"));
         expectArg("причина из пробелов", () -> submitted().reject("            "));
         expectArg("причина null", () -> submitted().reject(null));
@@ -54,6 +54,14 @@ public class SelfCheck {
         expectState("complete в день окончания", () -> approved().complete(END));
         check("complete на следующий день после окончания", run(() -> approved().complete(END.plusDays(1))));
         expectArg("дата неверного формата", () -> TripApp.parseDate("05.10.2026"));
+        // вариант 3: не более 20 календарных дней включительно
+        check("20 дней (1..20 октября) допустимо", run(() -> new BusinessTrip("T", new Employee("E", "Тест"),
+                START, START.plusDays(19))));
+        expectArg("21 день (1..21 октября)", () -> new BusinessTrip("T", new Employee("E", "Тест"),
+                START, START.plusDays(20)));
+        expectArg("продление до 21 дня в черновике", () -> filled().updateDetails("Казань", "x", START, START.plusDays(20)));
+        check("переход через месяц: 25.10..13.11 = 20 дней", run(() -> new BusinessTrip("T", new Employee("E", "Тест"),
+                LocalDate.of(2026, 10, 25), LocalDate.of(2026, 11, 13))));
 
         // сервис
         BusinessTripService service = new BusinessTripService();

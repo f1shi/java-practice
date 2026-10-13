@@ -9,16 +9,20 @@ import java.util.Optional;
 public class BookingService {
 
     public static final Duration MIN_DURATION = Duration.ofMinutes(15);
-    /** Индивидуальный вариант 1: максимальная длительность = 10 часов (базовое правило — 8 часов). */
-    public static final Duration MAX_DURATION = Duration.ofHours(10);
+    public static final Duration MAX_DURATION = Duration.ofHours(8);
+    /**
+     * Индивидуальный вариант 3: буфер между бронированиями одной комнаты = 20 минут
+     * (на уборку и подготовку). Следующее бронирование может начаться не раньше чем через 20 минут после окончания.
+     */
+    public static final Duration DEFAULT_BUFFER = Duration.ofMinutes(20);
 
     private final BookingRepository repository;
-    /** Буфер между бронированиями одной комнаты; по умолчанию нулевой (стык «конец = начало» допустим). */
+    /** Буфер между бронированиями одной комнаты; Duration.ZERO даёт базовое правило «стык не конфликт». */
     private final Duration buffer;
     private int sequence;
 
     public BookingService(BookingRepository repository) {
-        this(repository, Duration.ZERO);
+        this(repository, DEFAULT_BUFFER);
     }
 
     public BookingService(BookingRepository repository, Duration buffer) {

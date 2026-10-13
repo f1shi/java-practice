@@ -15,12 +15,13 @@ java -cp out SelfCheck
 | Самовывоз | `PickupPolicy` | 0 | вес ≤ 50 кг |
 | Стандартный курьер | `StandardCourierPolicy` | 300 + 20 × км + 15 × (вес − 5)⁺ | ≤ 100 км, ≤ 30 кг |
 | Экспресс | `ExpressPolicy` | max(800, 500 + 40 × км) | ≤ 50 км, ≤ 10 кг |
-| **Региональная (вариант)** | `RegionalPolicy` | 200 + **10** × км | 20…1000 км, ≤ 100 кг |
+| **Постамат (вариант 3)** | `ParcelLockerPolicy` | 250 + 10 × кг | ≤ **20 кг**, ≤ 30 км |
 
 ## Индивидуальный вариант
 
-**Вариант 1: стоимость километра = 10 ₽.** Добавлен четвёртый способ REGIONAL (транспортная компания) с тарифом 10 ₽ за километр. Константа: `RegionalPolicy.PER_KM`.
-Для добавления понадобились новый класс `RegionalPolicy`, константа `REGIONAL` в `DeliveryType` и одна строка регистрации в `DeliveryPolicyFactory.withDefaultPolicies()`. Ни `DeliveryService`, ни три существующие политики не менялись.
+**Вариант 3: ограничение по весу = 20 кг.** Номер варианта: (58 mod 8) + 1 = 3.
+Добавлен четвёртый способ PARCEL_LOCKER — доставка в постамат, ячейка которого ограничивает вес: посылка **до 20 кг включительно**. 20 кг — расчёт, 20.01 кг — `DeliveryNotPossibleException`. Константа: `ParcelLockerPolicy.MAX_WEIGHT_KG`.
+Для добавления понадобились новый класс `ParcelLockerPolicy`, константа `PARCEL_LOCKER` в `DeliveryType` и одна строка регистрации в `DeliveryPolicyFactory.withDefaultPolicies()`. Ни `DeliveryService`, ни три существующие политики не менялись.
 
 ## Activity-диаграмма (итоговая)
 
@@ -50,8 +51,8 @@ classDiagram
     class PickupPolicy
     class StandardCourierPolicy
     class ExpressPolicy
-    class RegionalPolicy {
-        ~PER_KM: double = 10
+    class ParcelLockerPolicy {
+        ~MAX_WEIGHT_KG: double = 20
     }
     class DeliveryPolicyFactory {
         -policies: Map~DeliveryType, DeliveryPolicy~
@@ -74,14 +75,14 @@ classDiagram
         PICKUP
         STANDARD
         EXPRESS
-        REGIONAL
+        PARCEL_LOCKER
         +parse(String)$ DeliveryType
     }
     class DeliveryNotPossibleException
     DeliveryPolicy <|.. PickupPolicy
     DeliveryPolicy <|.. StandardCourierPolicy
     DeliveryPolicy <|.. ExpressPolicy
-    DeliveryPolicy <|.. RegionalPolicy
+    DeliveryPolicy <|.. ParcelLockerPolicy
     DeliveryService o-- "1" DeliveryPolicyFactory
     DeliveryPolicyFactory ..> DeliveryPolicy : creates/selects
     DeliveryService ..> DeliveryNotPossibleException : throws
@@ -106,8 +107,8 @@ if (type == EXPRESS) { ... } else if (type == STANDARD) { ... } else if (type ==
 | Проверка | Ожидание |
 |---|---|
 | Типовое значение: стандарт 10 км, 3 кг | 500,00 |
-| Нижние границы: 5 кг без доплаты; региональная 20 км / 19.9 км | 300,00; 400,00 / отказ |
-| Верхние границы: стандарт 100 км и 30 кг / 100.1 км; экспресс 10 кг / 10.01 кг; региональная 1000 / 1000.1 км | расчёт / отказ |
+| Нижние границы: 5 кг без доплаты; самовывоз 0 км | 300,00; 0,00 |
+| Верхние границы: стандарт 100 км и 30 кг / 100.1 км; экспресс 10 кг / 10.01 кг; постамат 20 кг / 20.01 кг (вариант 3) и 30 км / 30.1 км | расчёт / отказ |
 | Пустые значения: пустой тип, тип `null` | IllegalArgumentException |
 | Неверный формат: `DRONE`, расстояние `abc`, вес 0, расстояние −1 | IllegalArgumentException |
 | Конфликт: две политики одного типа в фабрике; нет политики для типа | IllegalArgumentException |
@@ -120,4 +121,4 @@ if (type == EXPRESS) { ... } else if (type == STANDARD) { ... } else if (type ==
 
 **Как Activity-диаграмма отражает код.** A1 — `factory.get(request.type())`. Ромб «Доставка возможна» — `if (!policy.supports(request)) throw new DeliveryNotPossibleException(...)`. «Вызвать calculateCost полиморфно» — `policy.calculateCost(request)`: конкретный метод выбирается во время выполнения по классу объекта.
 
-**Какое изменение затронет минимум классов.** Изменение тарифа одного способа (например, стоимости километра в варианте) затрагивает только его класс-политику. Новый способ — новый класс + константа enum + одна строка регистрации.
+**Какое изменение затронет минимум классов.** Изменение ограничения одного способа (например, веса для постамата в варианте) затрагивает только его класс-политику. Новый способ — новый класс + константа enum + одна строка регистрации.

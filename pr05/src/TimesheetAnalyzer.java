@@ -10,9 +10,10 @@ public class TimesheetAnalyzer {
     static final int DAYS_IN_WEEK = 5;
     static final int MIN_HOURS = 0;
     static final int MAX_HOURS = 16;
-    /** Индивидуальный вариант 1: норма часов в день = 10. Переработкой считается день, где часов больше нормы. */
-    static final int DAILY_NORM = 10;
-    static final int WEEKLY_NORM = 40;
+    /** Дневная норма: переработкой считается день, где часов больше нормы. */
+    static final int DAILY_NORM = 8;
+    /** Индивидуальный вариант 3: недельная норма = 20 часов. Недельная переработка = max(0, сумма - 20). */
+    static final int WEEKLY_NORM = 20;
     static final String SEPARATOR = ";";
 
     public static void main(String[] args) {

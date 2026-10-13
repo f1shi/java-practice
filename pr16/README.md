@@ -11,8 +11,11 @@ java -cp out SelfCheck
 
 ## Индивидуальный вариант
 
-**Вариант 1: размер пула, модификатор 10.** Реализованное правило: допустимый размер пула **от 1 до 10** (базовое правило — 1..8). 1 и 10 допустимы, 0 и 11 дают `IllegalArgumentException` при создании `BatchProcessor`.
-Параметр: `BatchProcessor.MAX_POOL_SIZE`.
+**Вариант 3: дополнительный агрегат, модификатор 20.** Номер варианта: (58 mod 8) + 1 = 3.
+Реализован агрегат **«число объёмных документов»**: успешно обработанные документы, в которых **не менее 20 слов**. 19 слов не учитываются, 20 и 21 учитываются, документы с ошибкой не учитываются. Счётчик — `AtomicInteger` в `BatchResult` (`getLargeDocumentCount()`), обновляется в `registerSuccess` так же потокобезопасно, как и остальные агрегаты. Результат одинаков при любом размере пула.
+Параметр: `BatchResult.LARGE_DOCUMENT_WORDS`.
+
+Допустимый размер пула — от 1 до 8 (`BatchProcessor.MIN_POOL_SIZE`/`MAX_POOL_SIZE`).
 
 ## Сравнение времени (пример запуска на тестовом наборе)
 
@@ -20,8 +23,8 @@ java -cp out SelfCheck
 
 | Режим | Результат | Время |
 |---|---|---|
-| Последовательный | успешно 17, ошибок 4, слов 161 | ≈ 2076 мс |
-| Пул из 4 потоков | успешно 17, ошибок 4, слов 161 | ≈ 529 мс |
+| Последовательный | успешно 17, ошибок 4, слов 324, документов от 20 слов 11 | ≈ 2094 мс |
+| Пул из 4 потоков | успешно 17, ошибок 4, слов 324, документов от 20 слов 11 | ≈ 536 мс |
 
 Агрегаты совпадают, время сократилось примерно в 4 раза: 20 уникальных документов по 100 мс = 2 с, а 4 потока × 5 волн ≈ 0,5 с. **Это не гарантия ускорения.** Результат зависит от числа ядер, характера нагрузки (здесь `sleep` имитирует ожидание ввода-вывода, а не вычисления), накладных расходов на создание пула и распределения длительностей задач. Для CPU-нагрузки ускорение ограничено числом ядер, а на маленьком наборе пул может оказаться медленнее последовательного цикла.
 
@@ -31,12 +34,12 @@ java -cp out SelfCheck
 flowchart TD
     S([Начало]) --> IN[/Получить список документов/]
     IN --> DUP["Отсеять дубликаты id → registerError"]
-    DUP --> P["Создать фиксированный пул: Executors.newFixedThreadPool(poolSize), 1 ≤ poolSize ≤ 10"]
+    DUP --> P["Создать фиксированный пул: Executors.newFixedThreadPool(poolSize), 1 ≤ poolSize ≤ 8"]
     P --> A1["A1: для каждого документа создать Callable: () -> processor.process(document)"]
     A1 --> SUB["Отправить задачи в ExecutorService: executor.submit, сохранить Future в списке"]
     SUB --> G["Получать результаты Future по очереди: future.get()"]
     G --> D{Задача завершилась успешно?}
-    D -- да --> OK["Безопасно обновить агрегаты: successCount.incrementAndGet, totalWords.addAndGet"] --> G
+    D -- да --> OK["Безопасно обновить агрегаты: successCount.incrementAndGet, totalWords.addAndGet,<br/>largeDocuments.incrementAndGet при ≥ 20 слов"] --> G
     D -- "нет (ExecutionException)" --> ER["Зафиксировать ошибку конкретного документа: errors.merge(id, причина)"] --> G
     G -- все получены --> SH["Закрыть пул: finally { shutdown; awaitTermination; shutdownNow при таймауте }"]
     SH --> E([Завершение])
@@ -48,7 +51,7 @@ flowchart TD
 classDiagram
     class BatchProcessor {
         +MIN_POOL_SIZE: int = 1
-        +MAX_POOL_SIZE: int = 10
+        +MAX_POOL_SIZE: int = 8
         -processor: DocumentProcessor
         -poolSize: int
         +processAll(List~Document~) BatchResult
@@ -61,11 +64,14 @@ classDiagram
         +process(Document) ProcessingResult
     }
     class BatchResult {
+        +LARGE_DOCUMENT_WORDS: int = 20
         -successCount: AtomicInteger
+        -largeDocuments: AtomicInteger
         -totalWords: AtomicLong
         -errors: ConcurrentMap~String, String~
         +registerSuccess(ProcessingResult)
         +registerError(String, String)
+        +getLargeDocumentCount() int
         +getErrors() Map~String, String~
     }
     class Document {
@@ -107,9 +113,10 @@ for (Document d : docs) { new Thread(() -> process(d)).start(); } // неогр�
 
 | Проверка | Ожидание |
 |---|---|
-| Типовое: 50 документов, пулы 1, 3, 8, 10 | всегда 45 успешных, 5 ошибок, 1125 слов (детерминированно) |
+| Типовое: 50 документов, пулы 1, 3, 8 | всегда 45 успешных, 5 ошибок, 1125 слов, 27 документов от 20 слов (детерминированно) |
+| Агрегат варианта 3: 19 / 20 / 21 слово, пустой документ | не учитывается / учитывается / учитывается / не учитывается |
 | Последовательный режим | те же агрегаты |
-| Нижняя/верхняя граница пула: 0 / 1 / 10 / 11 | ошибка / OK / OK / ошибка |
+| Нижняя/верхняя граница пула: 0 / 1 / 8 / 9 | ошибка / OK / OK / ошибка |
 | Пустое значение: пустой документ, пустой список, `null`-список, пустой id | ошибка документа / нули / IllegalArgumentException |
 | Неверный формат: документ с `#CORRUPTED` | ошибка этого документа, остальные обработаны |
 | Повтор: два документа с одним id | первый обработан, второй — ошибка «дубликат» |
@@ -123,4 +130,4 @@ for (Document d : docs) { new Thread(() -> process(d)).start(); } // неогр�
 
 **Как Activity-диаграмма отражает код.** A1 — лямбда `() -> processor.process(document)`, присвоенная `Callable<ProcessingResult>`. «Получать результаты Future» — цикл `for` по `futures` с вызовом `collect`. Ромб «Задача завершилась успешно» — `try { future.get() } catch (ExecutionException e)`. «Закрыть пул» — блок `finally` с `shutdown()`.
 
-**Какое изменение затронет минимум классов.** Изменение допустимого размера пула — одна константа `MAX_POOL_SIZE`. Изменение условия ошибки документа — только `DocumentProcessor.process`. Новый агрегат (например, максимальная длина документа) — одно атомарное поле и строка в `registerSuccess` класса `BatchResult`.
+**Какое изменение затронет минимум классов.** Изменение допустимого размера пула — одна константа `MAX_POOL_SIZE`. Изменение условия ошибки документа — только `DocumentProcessor.process`. Изменение порога «объёмного» документа (вариант) — одна константа `BatchResult.LARGE_DOCUMENT_WORDS`. Новый агрегат — одно атомарное поле и строка в `registerSuccess` класса `BatchResult`, как сделано для агрегата варианта 3.

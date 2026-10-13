@@ -6,8 +6,14 @@ import java.util.Scanner;
  */
 public class OrderCalculator {
 
-    /** Ставка НДС в процентах. Индивидуальный вариант 1: ставка НДС = 10 %. Меняется только здесь. */
-    static final double VAT_RATE = 10.0;
+    /** Ставка НДС в процентах. */
+    static final double VAT_RATE = 20.0;
+    /**
+     * Индивидуальный вариант 3: порог бесплатной обработки = 20 000 руб.
+     * Если сумма после скидки не меньше порога, обработка бесплатна; иначе взимается PROCESSING_FEE.
+     */
+    static final double FREE_PROCESSING_THRESHOLD = 20_000.0;
+    static final double PROCESSING_FEE = 500.0;
 
     static final int MIN_QUANTITY = 1;
     static final int MAX_QUANTITY = 10_000;
@@ -44,12 +50,16 @@ public class OrderCalculator {
 
         double base = calculateBase(quantity, price);
         double discounted = applyDiscount(base, discount);
-        double vat = calculateVat(discounted, VAT_RATE);
-        double total = round(discounted + vat);
+        double fee = processingFee(discounted);
+        double taxable = round(discounted + fee);
+        double vat = calculateVat(taxable, VAT_RATE);
+        double total = round(taxable + vat);
 
         System.out.println("Базовая стоимость: " + formatRub(base));
         System.out.println("Скидка " + formatPercent(discount) + ": " + formatRub(base - discounted));
         System.out.println("Сумма после скидки: " + formatRub(discounted));
+        System.out.println("Обработка заказа: " + (fee == 0 ? "бесплатно (сумма от "
+                + formatRub(FREE_PROCESSING_THRESHOLD) + ")" : formatRub(fee)));
         System.out.println("НДС " + formatPercent(VAT_RATE) + ": " + formatRub(vat));
         System.out.println("Итого к оплате: " + formatRub(total));
     }
@@ -70,10 +80,19 @@ public class OrderCalculator {
         return round(amountAfterDiscount * vatRatePercent / 100.0);
     }
 
-    /** Итоговая сумма: база -> скидка -> НДС. Используется и в SelfCheck, чтобы формула не дублировалась. */
+    /** Плата за обработку: 0, если сумма после скидки достигла порога бесплатной обработки (граница включается). */
+    public static double processingFee(double amountAfterDiscount) {
+        return amountAfterDiscount >= FREE_PROCESSING_THRESHOLD ? 0.0 : PROCESSING_FEE;
+    }
+
+    /**
+     * Итоговая сумма: база -> скидка -> плата за обработку -> НДС на (сумма после скидки + обработка).
+     * Используется и в main, и в SelfCheck, чтобы формула не дублировалась.
+     */
     public static double calculateTotal(int quantity, double price, double discountPercent) {
         double discounted = applyDiscount(calculateBase(quantity, price), discountPercent);
-        return round(discounted + calculateVat(discounted, VAT_RATE));
+        double taxable = round(discounted + processingFee(discounted));
+        return round(taxable + calculateVat(taxable, VAT_RATE));
     }
 
     public static boolean isValid(int quantity, double price, double discountPercent) {

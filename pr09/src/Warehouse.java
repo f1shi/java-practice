@@ -13,8 +13,11 @@ import java.util.Set;
  */
 public class Warehouse {
 
-    /** Индивидуальный вариант 1: минимальный (неснижаемый) резерв = 10 единиц каждой позиции при выдаче. */
-    public static final int MIN_RESERVE = 10;
+    /**
+     * Индивидуальный вариант 3 — правило списания (модификатор 20):
+     * за одну операцию выдачи можно списать не более 20 единиц позиции; больший объём оформляется несколькими операциями.
+     */
+    public static final int MAX_ISSUE_PER_OPERATION = 20;
 
     private final Map<String, StockItem> items = new LinkedHashMap<>();
     private final List<StockMovement> movements = new ArrayList<>();
@@ -33,7 +36,11 @@ public class Warehouse {
 
     public void issue(String code, int quantity) {
         StockItem item = find(code);
-        item.decrease(quantity, MIN_RESERVE);
+        if (quantity > MAX_ISSUE_PER_OPERATION) {
+            throw new IllegalArgumentException("за одну операцию можно списать не более " + MAX_ISSUE_PER_OPERATION
+                    + " ед., запрошено " + quantity);
+        }
+        item.decrease(quantity);
         movements.add(new StockMovement(item.getCode(), MovementType.ISSUE, quantity));
     }
 

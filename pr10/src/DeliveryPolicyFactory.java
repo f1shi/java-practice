@@ -21,7 +21,7 @@ public class DeliveryPolicyFactory {
                 new PickupPolicy(),
                 new StandardCourierPolicy(),
                 new ExpressPolicy(),
-                new RegionalPolicy()));
+                new ParcelLockerPolicy()));
     }
 
     public DeliveryPolicy get(DeliveryType type) {

@@ -10,12 +10,21 @@ public class SelfCheck {
         ClientRepository repo = new ClientRepository();
         ImportResult r = newImporter(repo).importFile(Path.of("data/sample.csv"));
         System.out.println(r);
-        check("sample.csv: принято 3", r.getAccepted() == 3);
-        check("sample.csv: отклонено 8, пустая строка пропущена", r.getRejected() == 8);
+        check("sample.csv: принято 4", r.getAccepted() == 4);
+        check("sample.csv: отклонено 7, пустая строка пропущена", r.getRejected() == 7);
+        check("sample.csv: 1 дубликат из 11 строк — без предупреждения", r.getDuplicates() == 1 && !r.isDuplicateWarning());
         check("ошибка содержит номер строки 4 (ИНН из 9 цифр)", r.getErrors().get(0).lineNumber() == 4);
         check("дубликат ИНН отклонён, сохранён первый клиент",
                 repo.findByInn("7701234567").orElseThrow().name().equals("ООО Ромашка"));
         check("телефон нормализован до 10 цифр", repo.findByInn("7701234567").orElseThrow().phone().equals("9161234567"));
+
+        // вариант 3: дубликатов больше 20 % строк — предупреждение, импорт не прерывается
+        ImportResult reimport = newImporter(new ClientRepository()).importFile(Path.of("data/test/reimport.csv"));
+        check("2 дубликата из 5 строк (40 %) -> предупреждение, 3 принято",
+                reimport.isDuplicateWarning() && reimport.getAccepted() == 3 && reimport.getDuplicates() == 2);
+        ImportResult exact = newImporter(new ClientRepository()).importFile(Path.of("data/test/duplicates_20pct.csv"));
+        check("1 дубликат из 5 строк (ровно 20 %) -> без предупреждения",
+                !exact.isDuplicateWarning() && exact.getDuplicates() == 1 && exact.getAccepted() == 4);
 
         fileError("файл не существует", "data/test/no_such_file.csv");
         fileError("пустой файл", "data/test/empty.csv");
@@ -39,10 +48,10 @@ public class SelfCheck {
         check("телефон +7 и 11 цифр", "9161234567".equals(ClientValidator.normalizePhone("+7(916)1234567")));
         check("телефон 9 цифр — ошибка", ClientValidator.normalizePhone("916123456") == null);
         check("телефон с буквами — ошибка", ClientValidator.normalizePhone("916abc4567") == null);
-        check("пустой телефон — ошибка валидации",
-                !v.validate(new ClientDraft(2, "ООО", "7701234567", "a@b.ru", "")).isValid());
+        check("пустой телефон допустим (поле необязательное)",
+                v.validate(new ClientDraft(2, "ООО", "7701234567", "a@b.ru", "")).isValid());
         check("несколько ошибок одной строки собираются вместе",
-                v.validate(new ClientDraft(2, "", "1", "x", "")).errors().size() == 4);
+                v.validate(new ClientDraft(2, "", "1", "x", "12")).errors().size() == 4);
 
         System.out.printf("%nИтого: пройдено %d, не пройдено %d%n", passed, failed);
         if (failed > 0) {

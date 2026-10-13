@@ -1,6 +1,7 @@
 amount;urgent;risk;personalData;expected
 120000;false;LOW;false;STANDARD
-120000;true;LOW;false;FAST_TRACK
+80000;true;LOW;false;FAST_TRACK
+120000;true;LOW;false;STANDARD
 800000;true;MEDIUM;false;FINANCE_REVIEW
 50000;false;HIGH;false;DIRECTOR_REVIEW
 50000;true;LOW;true;SECURITY_REVIEW

@@ -17,6 +17,8 @@ public class SalesApp {
         System.out.println("Максимальная: " + service.maxSale(sales).map(Sale::toString).orElse("нет продаж"));
         System.out.println("Итоги по менеджерам: " + service.totalsByManager(sales));
         System.out.printf(Locale.ROOT, "Среднее по региону Москва: %.2f%n", service.averageByRegion(sales, "Москва"));
+        System.out.println("Доля выручки от " + SalesAnalyticsService.TOP_DEALS_PERCENT + " % крупнейших сделок: "
+                + service.topDealsRevenueShare(sales) + " %");
         System.out.println("Крупные сделки (>= " + SalesAnalyticsService.LARGE_DEAL_THRESHOLD + "): "
                 + service.largeSales(sales).size());
     }

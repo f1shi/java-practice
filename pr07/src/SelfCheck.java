@@ -25,24 +25,37 @@ public class SelfCheck {
         order.removeProduct("P-400");
         check("удаление по id товара", order.getItems().size() == 1 && order.total() == 5000.00);
 
-        // границы количества (вариант 1: 1..10)
+        // границы количества одной строки: 1..100
         expectError("количество 0", () -> service.createOrder(employee).addProduct(laptop, 0));
         expectOk("количество 1", () -> service.createOrder(employee).addProduct(laptop, 1));
-        expectOk("количество 10 (верхняя граница варианта)", () -> service.createOrder(employee).addProduct(laptop, 10));
-        expectError("количество 11", () -> service.createOrder(employee).addProduct(laptop, 11));
-        expectError("объединение 6 + 5 = 11 > 10", () -> {
+        expectOk("количество 100 (верхняя граница)", () -> service.createOrder(employee).addProduct(laptop, 100));
+        expectError("количество 101", () -> service.createOrder(employee).addProduct(laptop, 101));
+
+        // вариант 3: объединение повторного товара — итог не больше 20
+        expectOk("объединение 15 + 5 = 20 (граница включается)", () -> {
             Order o = service.createOrder(employee);
-            o.addProduct(laptop, 6);
+            o.addProduct(laptop, 15);
             o.addProduct(laptop, 5);
         });
+        expectError("объединение 15 + 6 = 21", () -> {
+            Order o = service.createOrder(employee);
+            o.addProduct(laptop, 15);
+            o.addProduct(laptop, 6);
+        });
+        expectError("строка 50 шт. + повтор 1 шт.", () -> {
+            Order o = service.createOrder(employee);
+            o.addProduct(laptop, 50);
+            o.addProduct(laptop, 1);
+        });
         Order merged = service.createOrder(employee);
-        merged.addProduct(laptop, 6);
+        merged.addProduct(laptop, 15);
         try {
-            merged.addProduct(laptop, 5);
+            merged.addProduct(laptop, 6);
         } catch (IllegalArgumentException ignored) {
             // ожидаемо
         }
-        check("неудачное объединение не изменило количество (6)", merged.getItems().get(0).getQuantity() == 6);
+        check("неудачное объединение не изменило количество (15)", merged.getItems().get(0).getQuantity() == 15
+                && merged.getItems().size() == 1);
 
         // пустые и неверные значения
         expectError("товар null", () -> service.createOrder(employee).addProduct(null, 1));

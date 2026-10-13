@@ -41,9 +41,9 @@ class BonusCalculatorTest {
         }
 
         @Test
-        @DisplayName("KPI 95 %, рейтинг 5, стаж 4 — 20 + 5 + 2 = 27 %")
+        @DisplayName("KPI 70 %, рейтинг 5, стаж 4 — 10 + 5 + 2 = 17 %")
         void allBonusesCombined() {
-            assertEquals(27_000.0, bonus(SALARY, 95, 5, 4), DELTA);
+            assertEquals(17_000.0, bonus(SALARY, 70, 5, 4), DELTA);
         }
 
         @Test
@@ -70,10 +70,19 @@ class BonusCalculatorTest {
         }
 
         @Test
-        @DisplayName("Вариант 1: KPI 60.00 — премия есть, 59.99 — нет")
+        @DisplayName("KPI 50.00 — премия есть, 49.99 — нет")
         void kpiMinimumBoundary() {
-            assertEquals(10_000.0, bonus(SALARY, 60.00, 3, 0), DELTA);
-            assertEquals(0.0, bonus(SALARY, 59.99, 3, 0), DELTA);
+            assertEquals(10_000.0, bonus(SALARY, 50.00, 3, 0), DELTA);
+            assertEquals(0.0, bonus(SALARY, 49.99, 3, 0), DELTA);
+        }
+
+        @Test
+        @DisplayName("Вариант 3: ставка ровно 20 % не урезается, 22 % и 30 % ограничиваются до 20 %")
+        void maxBonusCap() {
+            assertEquals(20_000.0, bonus(SALARY, 80, 3, 0), DELTA);   // 20 % — на границе
+            assertEquals(20_000.0, bonus(SALARY, 79.99, 5, 10), DELTA); // 10 + 5 + 5 = 20 %
+            assertEquals(20_000.0, bonus(SALARY, 80, 3, 3), DELTA);   // 22 % -> 20 %
+            assertEquals(20_000.0, bonus(SALARY, 95, 5, 12), DELTA);  // 30 % -> 20 %
         }
 
         @Test
@@ -94,7 +103,7 @@ class BonusCalculatorTest {
         @DisplayName("D4: рейтинг 2 — премии нет, рейтинг 3 — есть")
         void ratingBoundary() {
             assertEquals(0.0, bonus(SALARY, 95, 2, 5), DELTA);
-            assertEquals(22_000.0, bonus(SALARY, 95, 3, 5), DELTA);
+            assertEquals(12_000.0, bonus(SALARY, 70, 3, 5), DELTA);
         }
 
         @Test
@@ -144,14 +153,15 @@ class BonusCalculatorTest {
     @ParameterizedTest(name = "оклад {0}, KPI {1}, рейтинг {2}, стаж {3} -> {4}")
     @DisplayName("Таблица правил расчёта")
     @CsvSource({
-            "100000, 59.99, 5, 20,     0.00",
-            "100000, 60.00, 3,  0, 10000.00",
+            "100000, 49.99, 5, 20,     0.00",
+            "100000, 50.00, 3,  0, 10000.00",
             "100000, 79.99, 4,  2, 10000.00",
             "100000, 80.00, 4,  2, 20000.00",
-            "100000, 80.00, 5,  3, 27000.00",
-            "100000, 150.0, 5, 10, 30000.00",
+            "100000, 80.00, 5,  3, 20000.00",
+            "100000, 150.0, 5, 10, 20000.00",
             " 55555, 85.00, 1, 15,     0.00",
-            " 55555, 85.00, 3, 15, 13888.75"
+            " 55555, 85.00, 3, 15, 11111.00",
+            " 55555, 70.00, 4, 15,  8333.25"
     })
     void rulesTable(double salary, double kpi, int rating, int years, double expected) {
         assertEquals(expected, bonus(salary, kpi, rating, years), DELTA);

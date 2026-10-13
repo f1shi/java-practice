@@ -16,8 +16,7 @@ import java.util.concurrent.TimeUnit;
 public class BatchProcessor {
 
     public static final int MIN_POOL_SIZE = 1;
-    /** Индивидуальный вариант 1: верхняя граница размера пула = 10 (базовое правило — 8). */
-    public static final int MAX_POOL_SIZE = 10;
+    public static final int MAX_POOL_SIZE = 8;
 
     private final DocumentProcessor processor;
     private final int poolSize;

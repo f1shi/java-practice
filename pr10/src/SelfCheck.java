@@ -19,12 +19,12 @@ public class SelfCheck {
         cost("экспресс 30 км = 500 + 1200", DeliveryType.EXPRESS, 30, 2, 1700.0);
         cost("экспресс граница 50 км 10 кг", DeliveryType.EXPRESS, 50, 10, 2500.0);
         impossible("экспресс 10.01 кг", DeliveryType.EXPRESS, 1, 10.01);
-        // индивидуальный вариант: региональная, 10 руб./км
-        cost("региональная 300 км = 200 + 300*10", DeliveryType.REGIONAL, 300, 80, 3200.0);
-        cost("региональная нижняя граница 20 км", DeliveryType.REGIONAL, 20, 1, 400.0);
-        cost("региональная верхняя граница 1000 км", DeliveryType.REGIONAL, 1000, 100, 10200.0);
-        impossible("региональная 19.9 км", DeliveryType.REGIONAL, 19.9, 1);
-        impossible("региональная 1000.1 км", DeliveryType.REGIONAL, 1000.1, 1);
+        // индивидуальный вариант 3: постамат, вес до 20 кг
+        cost("постамат 5 км 3 кг = 250 + 30", DeliveryType.PARCEL_LOCKER, 5, 3, 280.0);
+        cost("постамат граница 20 кг = 250 + 200", DeliveryType.PARCEL_LOCKER, 10, 20, 450.0);
+        impossible("постамат 20.01 кг", DeliveryType.PARCEL_LOCKER, 10, 20.01);
+        cost("постамат граница 30 км", DeliveryType.PARCEL_LOCKER, 30, 1, 260.0);
+        impossible("постамат 30.1 км", DeliveryType.PARCEL_LOCKER, 30.1, 1);
 
         expectError("отрицательное расстояние", () -> new DeliveryRequest(DeliveryType.STANDARD, -1, 1));
         expectError("нулевой вес", () -> new DeliveryRequest(DeliveryType.STANDARD, 1, 0));
@@ -38,7 +38,7 @@ public class SelfCheck {
         expectError("нет политики для типа", () -> new DeliveryPolicyFactory(List.of(new PickupPolicy()))
                 .get(DeliveryType.EXPRESS));
         check("фабрика возвращает реализацию по типу",
-                DeliveryPolicyFactory.withDefaultPolicies().get(DeliveryType.REGIONAL) instanceof RegionalPolicy);
+                DeliveryPolicyFactory.withDefaultPolicies().get(DeliveryType.PARCEL_LOCKER) instanceof ParcelLockerPolicy);
 
         System.out.printf("%nИтого: пройдено %d, не пройдено %d%n", passed, failed);
         if (failed > 0) {

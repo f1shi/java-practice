@@ -4,7 +4,7 @@
 
 ```bash
 javac -encoding UTF-8 -d out src/*.java
-java -cp out NotificationApp   # уведомления из data/sample.csv (channel;recipient;message)
+java -cp out NotificationApp   # уведомления из data/sample.csv (channel;recipient;fallbackLogin;message)
 java -cp out SelfCheck
 ```
 
@@ -20,8 +20,15 @@ java -cp out SelfCheck
 
 ## Индивидуальный вариант
 
-**Вариант 1: новый канал, модификатор 10.** Добавлен канал **PUSH** (`PushChannel`): уведомление на мобильное устройство. Правило адресата: токен устройства из латинских букв и цифр длиной **не менее 10 символов**. 10 символов принимаются, 9 — отказ.
-Параметр: `PushChannel.MIN_TOKEN_LENGTH`. Для подключения нужны новый класс, константа `PUSH` в `ChannelType` и одна строка в `ChannelFactory.withDefaultChannels()`. Классы `EmailChannel`, `SmsChannel`, `InternalChannel` и `NotificationService` не изменялись.
+**Вариант 3: политика резервного канала, модификатор 20.** Номер варианта: (58 mod 8) + 1 = 3.
+Реализованное правило (класс `FallbackPolicy`):
+1. Если основной канал отклонил запрос (`supports` = false) и в запросе указан резервный адресат (`fallbackRecipient` — логин сотрудника), уведомление отправляется через **резервный канал INTERNAL**. Результат помечается «через резервный канал (… отказал: причина)».
+2. Резервных отправок — **не более 20** на экземпляр сервиса. Это защита от лавины: при массовом сбое основного канала внутренний ящик не заваливается. 20-я резервная отправка проходит, 21-я — отказ «лимит резервных отправок (20) исчерпан».
+3. Резерв не используется, если не прошла общая проверка запроса (пустой текст и т. п.), если основной канал сам INTERNAL или если резервный логин некорректен (тогда в отказе указаны обе причины).
+
+Параметры: `FallbackPolicy.DEFAULT_LIMIT` (20) и `FallbackPolicy.DEFAULT_CHANNEL` (INTERNAL). Политика передаётся в `NotificationService` через конструктор, как и фабрика. Существующие классы каналов не изменялись.
+
+**Добавленный канал (шаг 5)** — PUSH (`PushChannel`): токен устройства из латинских букв и цифр длиной не менее 10 символов. Для подключения нужны новый класс, константа `PUSH` в `ChannelType` и одна строка в `ChannelFactory.withDefaultChannels()`.
 
 ## Правила адресатов (валидация внутри своего канала)
 
@@ -45,7 +52,9 @@ flowchart TD
     SEL --> D{"Канал поддерживает адресата? channel.supports(request)"}
     D -- да --> SEND["Отправить через общий интерфейс: channel.send(request)"]
     SEND --> RES[Зафиксировать NotificationResult.sent] --> E([Завершение])
-    D -- нет --> VE["Вернуть ошибку валидации: NotificationResult.failed(channel.rejectionReason)"] --> E
+    D -- нет --> FB{"Вариант 3: указан fallbackRecipient, резервный логин корректен и лимит 20 не исчерпан?"}
+    FB -- да --> BK["Отправить через резервный канал INTERNAL: fallback.tryAcquire, backupChannel.send"] --> RES
+    FB -- нет --> VE["Вернуть ошибку валидации: NotificationResult.failed(channel.rejectionReason [+ причина резерва])"] --> E
 ```
 
 ## Диаграмма классов (итоговая)
@@ -75,14 +84,28 @@ classDiagram
     }
     class NotificationService {
         -factory: ChannelFactory
+        -fallback: FallbackPolicy
         +NotificationService(ChannelFactory)
+        +NotificationService(ChannelFactory, FallbackPolicy)
         +notify(NotificationRequest) NotificationResult
+        -tryFallback(NotificationRequest, String) NotificationResult
+    }
+    class FallbackPolicy {
+        +DEFAULT_CHANNEL: ChannelType = INTERNAL
+        +DEFAULT_LIMIT: int = 20
+        -channel: ChannelType
+        -limit: int
+        -used: int
+        +defaultPolicy()$ FallbackPolicy
+        ~tryAcquire() boolean
     }
     class NotificationRequest {
         <<record>>
         channel: ChannelType
         recipient: String
         message: String
+        fallbackRecipient: String
+        +hasFallback() boolean
     }
     class NotificationResult {
         <<record>>
@@ -103,6 +126,7 @@ classDiagram
     NotificationChannel <|.. InternalChannel
     NotificationChannel <|.. PushChannel
     NotificationService o-- "1" ChannelFactory
+    NotificationService o-- "1" FallbackPolicy
     ChannelFactory ..> NotificationChannel : creates/selects
     NotificationService ..> NotificationResult
 ```
@@ -126,13 +150,13 @@ switch (type) { case EMAIL -> new EmailSender().send(...); case SMS -> new SmsSe
 
 | Изменение | Затрагивает |
 |---|---|
-| Новый канал (PUSH в варианте) | новый класс + константа enum + строка в `withDefaultChannels` |
+| Новый канал (PUSH, шаг 5) | новый класс + константа enum + строка в `withDefaultChannels` |
 | Правило адресата одного канала (например, SMS-лимит 70 символов для кириллицы) | только класс этого канала |
 | Общий лимит длины сообщения | только `NotificationService.MAX_MESSAGE_LENGTH` |
 | Реальная интеграция с SMTP | только `EmailChannel.send` |
 | Тестирование сервиса | фиктивная реализация интерфейса, без изменения production-кода |
 
-## Граничные проверки (результат SelfCheck: 25/25 OK)
+## Граничные проверки (результат SelfCheck: 33/33 OK)
 
 | Проверка | Ожидание |
 |---|---|
@@ -143,6 +167,9 @@ switch (type) { case EMAIL -> new EmailSender().send(...); case SMS -> new SmsSe
 | Неверный формат: email без `@` / без точки / два `@`; номер `8916…`; кириллический логин; `FAX` | отказ / IllegalArgumentException |
 | Конфликт: канал зарегистрирован дважды; канал не подключён | IllegalArgumentException |
 | Фиктивный канал: `send` вызван ровно один раз; при ошибке A1 не вызван | OK |
+| Резервный канал (вариант 3): SMS `8916…` + логин `p.sidorov` | доставлено через INTERNAL |
+| Резерв: без логина / с кириллическим логином / основной канал принял / пустой текст | отказ основного / отказ с двумя причинами / резерв не используется / отказ без резерва |
+| Лимит резерва: 21 запрос с отказом основного канала | 20 доставлено, 21-й — отказ «лимит исчерпан» |
 
 ## Собственные формулировки
 
@@ -152,4 +179,4 @@ switch (type) { case EMAIL -> new EmailSender().send(...); case SMS -> new SmsSe
 
 **Как Activity-диаграмма отражает код.** A1 — `commonValidationError(request)`. «Выбрать NotificationChannel» — `factory.get(request.channel())`. Ромб — `if (!channel.supports(request))`. Ветка «нет» — `NotificationResult.failed(..., channel.rejectionReason(request))`, ветка «да» — `channel.send(request)`.
 
-**Какое изменение затронет минимум классов.** Изменение правила адресата одного канала — только класс этого канала. Например, длина токена в варианте — константа `PushChannel.MIN_TOKEN_LENGTH`.
+**Какое изменение затронет минимум классов.** Изменение правила адресата одного канала — только класс этого канала. Изменение лимита или канала резерва (вариант) — константы `FallbackPolicy.DEFAULT_LIMIT` / `DEFAULT_CHANNEL`, а для тестов — другой объект политики в конструкторе сервиса.

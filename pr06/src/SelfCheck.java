@@ -19,7 +19,8 @@ public class SelfCheck {
         }
 
         long L = ApprovalRouter.FINANCE_LIMIT;
-        // таблица решений: 10 сочетаний
+        long F = ApprovalRouter.FAST_TRACK_MAX_AMOUNT;
+        // таблица решений: 11 сочетаний
         checkRoute("1 ПДн + HIGH + крупная + срочная", L + 1, true, RiskLevel.HIGH, true, ApprovalRoute.SECURITY_REVIEW);
         checkRoute("2 ПДн + малая сумма + LOW", 1_000, false, RiskLevel.LOW, true, ApprovalRoute.SECURITY_REVIEW);
         checkRoute("3 ПДн + срочная (фрагмент из задания)", 1_000, true, RiskLevel.LOW, true, ApprovalRoute.SECURITY_REVIEW);
@@ -27,17 +28,19 @@ public class SelfCheck {
         checkRoute("5 HIGH + срочная + малая", 1_000, true, RiskLevel.HIGH, false, ApprovalRoute.DIRECTOR_REVIEW);
         checkRoute("6 MEDIUM + крупная + срочная", L, true, RiskLevel.MEDIUM, false, ApprovalRoute.FINANCE_REVIEW);
         checkRoute("7 LOW + крупная", L + 1, false, RiskLevel.LOW, false, ApprovalRoute.FINANCE_REVIEW);
-        checkRoute("8 LOW + срочная + малая", L - 1, true, RiskLevel.LOW, false, ApprovalRoute.FAST_TRACK);
-        checkRoute("9 MEDIUM + не срочная + малая", L - 1, false, RiskLevel.MEDIUM, false, ApprovalRoute.STANDARD);
-        checkRoute("10 сумма 0", 0, false, RiskLevel.LOW, false, ApprovalRoute.STANDARD);
-        // точные границы базового правила (500 000) — при варианте 1 это уже не порог
-        checkRoute("499 999 срочная", 499_999, true, RiskLevel.LOW, false, ApprovalRoute.FAST_TRACK);
-        checkRoute("500 000 срочная (вариант 1: ниже порога 550 000)", 500_000, true, RiskLevel.LOW, false, ApprovalRoute.FAST_TRACK);
-        checkRoute("500 001 не срочная", 500_001, false, RiskLevel.LOW, false, ApprovalRoute.STANDARD);
-        // границы порога варианта
-        checkRoute("549 999 срочная -> FAST_TRACK", 549_999, true, RiskLevel.LOW, false, ApprovalRoute.FAST_TRACK);
-        checkRoute("550 000 срочная -> FINANCE (>= включает)", 550_000, true, RiskLevel.LOW, false, ApprovalRoute.FINANCE_REVIEW);
-        checkRoute("550 001 -> FINANCE", 550_001, false, RiskLevel.LOW, false, ApprovalRoute.FINANCE_REVIEW);
+        checkRoute("8 LOW + срочная + 100 000", F, true, RiskLevel.LOW, false, ApprovalRoute.FAST_TRACK);
+        checkRoute("9 LOW + срочная + 300 000 (вариант 3)", 300_000, true, RiskLevel.LOW, false, ApprovalRoute.STANDARD);
+        checkRoute("10 MEDIUM + не срочная + малая", 1_000, false, RiskLevel.MEDIUM, false, ApprovalRoute.STANDARD);
+        checkRoute("11 сумма 0", 0, false, RiskLevel.LOW, false, ApprovalRoute.STANDARD);
+        // точные границы финансового порога 500 000
+        checkRoute("499 999 не срочная -> STANDARD", 499_999, false, RiskLevel.LOW, false, ApprovalRoute.STANDARD);
+        checkRoute("499 999 срочная -> STANDARD (выше 100 000)", 499_999, true, RiskLevel.LOW, false, ApprovalRoute.STANDARD);
+        checkRoute("500 000 срочная -> FINANCE (>= включает)", 500_000, true, RiskLevel.LOW, false, ApprovalRoute.FINANCE_REVIEW);
+        checkRoute("500 001 -> FINANCE", 500_001, false, RiskLevel.LOW, false, ApprovalRoute.FINANCE_REVIEW);
+        // границы ускоренного маршрута варианта 3: 100 000
+        checkRoute("99 999 срочная -> FAST_TRACK", 99_999, true, RiskLevel.LOW, false, ApprovalRoute.FAST_TRACK);
+        checkRoute("100 000 срочная -> FAST_TRACK (граница включается)", 100_000, true, RiskLevel.LOW, false, ApprovalRoute.FAST_TRACK);
+        checkRoute("100 001 срочная -> STANDARD", 100_001, true, RiskLevel.LOW, false, ApprovalRoute.STANDARD);
         // ошибки
         checkCsv("отрицательная сумма", "-1;false;LOW;false", "ERROR");
         checkCsv("пустая строка", "", "ERROR");

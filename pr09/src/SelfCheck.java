@@ -19,12 +19,14 @@ public class SelfCheck {
         w.issue("A-1", 5);
         check("типовая выдача: 25 - 5 = 20", w.find("A-1").getQuantity() == 20);
 
-        // граница резерва (вариант 1: остаток после выдачи >= 10)
-        w.issue("A-1", 10);
-        check("выдача до остатка ровно 10 (граница включается)", w.find("A-1").getQuantity() == 10);
-        expect("выдача, оставляющая 9", () -> w.issue("A-1", 1), IllegalStateException.class);
-        check("после отказа остаток не изменился", w.find("A-1").getQuantity() == 10);
-        expect("выдача при остатке ниже резерва (5)", () -> w.issue("A-2", 1), IllegalStateException.class);
+        // вариант 3: не более 20 единиц за одну выдачу
+        expect("выдача 21 ед. за раз", () -> w.issue("A-1", 21), IllegalArgumentException.class);
+        check("после отказа остаток не изменился (20)", w.find("A-1").getQuantity() == 20);
+        w.issue("A-1", 20);
+        check("выдача ровно 20 ед. (граница включается) -> остаток 0", w.find("A-1").getQuantity() == 0);
+        expect("выдача при нулевом остатке", () -> w.issue("A-1", 1), IllegalStateException.class);
+        expect("выдача больше остатка (5 при остатке 5 + 1)", () -> w.issue("A-2", 6), IllegalStateException.class);
+        w.receive("A-1", 15);
 
         // некорректные количества
         expect("приход 0", () -> w.receive("M-1", 0), IllegalArgumentException.class);
@@ -43,9 +45,9 @@ public class SelfCheck {
         check("после отказа исходная карточка не заменена", w.find("A-1").getCategory() == Category.LAPTOP);
 
         // операции фиксируются, только успешные
-        check("зафиксировано 5 операций", w.getMovements().size() == 5);
-        check("последняя операция — ISSUE A-1 10",
-                w.getMovements().get(4).equals(new StockMovement("A-1", MovementType.ISSUE, 10)));
+        check("зафиксировано 6 успешных операций", w.getMovements().size() == 6);
+        check("последняя операция — RECEIPT A-1 15",
+                w.getMovements().get(5).equals(new StockMovement("A-1", MovementType.RECEIPT, 15)));
         expect("журнал операций нельзя изменить", () -> w.getMovements().clear(), UnsupportedOperationException.class);
 
         // поиск возвращает копию
@@ -55,9 +57,9 @@ public class SelfCheck {
         check("поиск по пустой категории -> пустой список", w.findByCategory(Category.FURNITURE).isEmpty());
 
         Map<Category, Integer> totals = w.totalsByCategory();
-        check("сводка: LAPTOP = 15, MONITOR = 12", totals.get(Category.LAPTOP) == 15 && totals.get(Category.MONITOR) == 12);
+        check("сводка: LAPTOP = 20, MONITOR = 12", totals.get(Category.LAPTOP) == 20 && totals.get(Category.MONITOR) == 12);
         totals.put(Category.LAPTOP, 999);
-        check("изменение сводки не влияет на склад", w.totalsByCategory().get(Category.LAPTOP) == 15);
+        check("изменение сводки не влияет на склад", w.totalsByCategory().get(Category.LAPTOP) == 20);
         check("Set категорий без повторов: {LAPTOP, MONITOR}", w.usedCategories().size() == 2);
         check("equals по коду", new StockItem("A-1", "x", Category.NETWORK).equals(w.find("A-1")));
 

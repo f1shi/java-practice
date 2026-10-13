@@ -6,11 +6,15 @@ import java.util.Locale;
  */
 public class ApprovalRouter {
 
+    /** Порог финансового согласования, руб. */
+    static final long FINANCE_LIMIT = 500_000L;
     /**
-     * Порог финансового согласования, руб. Базовое значение 500 000.
-     * Индивидуальный вариант 1 (модификатор 10): порог увеличен на 10 % -> 550 000.
+     * Индивидуальный вариант 3 — поведение срочной заявки (модификатор 20):
+     * FAST_TRACK доступен только срочным заявкам на сумму не более 20 % порога финансового согласования
+     * (100 000 руб.). Более крупные срочные заявки ниже порога идут по STANDARD.
      */
-    static final long FINANCE_LIMIT = 550_000L;
+    static final int FAST_TRACK_PERCENT_OF_LIMIT = 20;
+    static final long FAST_TRACK_MAX_AMOUNT = FINANCE_LIMIT * FAST_TRACK_PERCENT_OF_LIMIT / 100;
 
     public ApprovalRoute route(long amount, boolean urgent, RiskLevel risk, boolean containsPersonalData) {
         validate(amount, risk);
@@ -23,14 +27,19 @@ public class ApprovalRouter {
         if (requiresFinanceReview(amount)) {
             return ApprovalRoute.FINANCE_REVIEW;    // 3. крупная сумма, срочность не ускоряет
         }
-        if (urgent) {
-            return ApprovalRoute.FAST_TRACK;        // 4. срочная и сумма меньше порога (гарантировано шагом 3)
+        if (urgent && qualifiesForFastTrack(amount)) {
+            return ApprovalRoute.FAST_TRACK;        // 4. срочная и сумма не больше 100 000 (вариант 3)
         }
         return ApprovalRoute.STANDARD;              // 5. все остальные случаи
     }
 
     static boolean requiresFinanceReview(long amount) {
         return amount >= FINANCE_LIMIT;
+    }
+
+    /** Вариант 3: ускоренный маршрут только для небольших срочных сумм (граница включается). */
+    static boolean qualifiesForFastTrack(long amount) {
+        return amount <= FAST_TRACK_MAX_AMOUNT;
     }
 
     private static void validate(long amount, RiskLevel risk) {
@@ -86,7 +95,7 @@ public class ApprovalRouter {
     public static void main(String[] args) {
         ApprovalRouter router = new ApprovalRouter();
         java.util.Scanner in = new java.util.Scanner(System.in);
-        System.out.print("Заявка (сумма;срочная;риск;перс.данные), например 600000;true;LOW;false: ");
+        System.out.print("Заявка (сумма;срочная;риск;перс.данные), например 80000;true;LOW;false: ");
         String line = in.hasNextLine() ? in.nextLine() : "";
         try {
             System.out.println("Маршрут: " + router.routeFromCsv(line));

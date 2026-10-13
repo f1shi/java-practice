@@ -4,7 +4,7 @@ import java.util.List;
 /** Бизнес-проверки полей клиента. Возвращает все найденные ошибки строки, а не только первую. */
 public class ClientValidator {
 
-    /** Индивидуальный вариант 1: телефон — обязательное поле, ровно 10 цифр номера (без кода страны). */
+    /** Телефон необязателен; если указан — ровно 10 цифр номера (без кода страны). */
     static final int PHONE_DIGITS = 10;
 
     public ValidationResult validate(ClientDraft draft) {
@@ -18,9 +18,7 @@ public class ClientValidator {
         if (!isValidEmail(draft.email())) {
             errors.add("некорректный email: '" + draft.email() + "'");
         }
-        if (draft.phone().isEmpty()) {
-            errors.add("телефон не заполнен (обязательное поле)");
-        } else if (normalizePhone(draft.phone()) == null) {
+        if (!draft.phone().isEmpty() && normalizePhone(draft.phone()) == null) {
             errors.add("телефон должен содержать " + PHONE_DIGITS + " цифр номера: '" + draft.phone() + "'");
         }
         return new ValidationResult(errors);

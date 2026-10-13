@@ -1,4 +1,5 @@
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Заявка на командировку. Статус меняется только доменными методами submit/approve/reject/cancel/complete;
@@ -7,8 +8,13 @@ import java.time.LocalDate;
  */
 public class BusinessTrip {
 
-    /** Индивидуальный вариант 1: минимальная длина причины отклонения = 10 символов (без учёта пробелов по краям). */
+    /** Минимальная длина причины отклонения (без учёта пробелов по краям). */
     public static final int MIN_REJECTION_REASON_LENGTH = 10;
+    /**
+     * Индивидуальный вариант 3 — дополнительная проверка даты (модификатор 20):
+     * командировка длится не более 20 календарных дней, считая день начала и день окончания.
+     */
+    public static final int MAX_TRIP_DAYS = 20;
 
     private final String id;
     private final Employee employee;
@@ -103,6 +109,11 @@ public class BusinessTrip {
         }
         if (end.isBefore(start)) {
             throw new IllegalArgumentException("дата окончания " + end + " раньше даты начала " + start);
+        }
+        long days = ChronoUnit.DAYS.between(start, end) + 1;
+        if (days > MAX_TRIP_DAYS) {
+            throw new IllegalArgumentException("командировка " + start + ".." + end + " длится " + days
+                    + " дн., максимум " + MAX_TRIP_DAYS);
         }
     }
 

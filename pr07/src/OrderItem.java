@@ -1,8 +1,8 @@
 /** Позиция заказа: товар и количество. Изменяется только через Order. */
 public class OrderItem {
 
-    /** Индивидуальный вариант 1: максимальное количество одной позиции = 10 (базовое правило — 100). */
-    public static final int MAX_QUANTITY = 10;
+    /** Допустимое количество одной позиции: от 1 до 100. */
+    public static final int MAX_QUANTITY = 100;
     public static final int MIN_QUANTITY = 1;
 
     private final Product product;

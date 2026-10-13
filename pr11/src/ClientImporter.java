@@ -47,6 +47,7 @@ public class ClientImporter {
 
     /** Обработка одной строки; её ошибки не выходят за пределы метода. */
     private void importLine(String line, int lineNumber, ImportResult result) {
+        result.countLine();
         ClientDraft draft;
         try {
             draft = parser.parse(line, lineNumber);
@@ -61,8 +62,8 @@ public class ClientImporter {
         }
         Optional<Client> existing = repository.findByInn(draft.inn());
         if (existing.isPresent()) {
-            // политика дубликатов: первая запись остаётся, повтор отклоняется
-            result.addError(lineNumber, "дубликат ИНН " + draft.inn() + " (уже импортирован клиент '"
+            // политика дубликатов (вариант 3): первая запись остаётся, повтор отклоняется и учитывается отдельно
+            result.addDuplicate(lineNumber, "дубликат ИНН " + draft.inn() + " (уже импортирован клиент '"
                     + existing.get().name() + "')");
             return;
         }

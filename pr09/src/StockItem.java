@@ -28,12 +28,12 @@ public class StockItem {
         quantity += amount;
     }
 
-    /** Уменьшение остатка. Нижний предел (резерв) задаёт склад; сама карточка не допускает отрицательного остатка. */
-    void decrease(int amount, int minRemaining) {
+    /** Уменьшение остатка; карточка не допускает отрицательного остатка. */
+    void decrease(int amount) {
         requirePositive(amount);
-        if (quantity - amount < minRemaining) {
+        if (amount > quantity) {
             throw new IllegalStateException("недостаточно остатка по " + code + ": на складе " + quantity
-                    + ", запрошено " + amount + ", неснижаемый резерв " + minRemaining);
+                    + ", запрошено " + amount);
         }
         quantity -= amount;
     }

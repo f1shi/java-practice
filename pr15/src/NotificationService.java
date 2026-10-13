@@ -4,13 +4,22 @@ public class NotificationService {
     static final int MAX_MESSAGE_LENGTH = 1000;
 
     private final ChannelFactory factory;
+    private final FallbackPolicy fallback;
 
-    /** Зависимость передаётся через конструктор — в тестах можно подставить фабрику с фиктивным каналом. */
     public NotificationService(ChannelFactory factory) {
+        this(factory, FallbackPolicy.defaultPolicy());
+    }
+
+    /** Зависимости передаются через конструктор — в тестах можно подставить фабрику с фиктивным каналом. */
+    public NotificationService(ChannelFactory factory, FallbackPolicy fallback) {
         if (factory == null) {
             throw new IllegalArgumentException("фабрика каналов обязательна");
         }
+        if (fallback == null) {
+            throw new IllegalArgumentException("политика резервного канала обязательна");
+        }
         this.factory = factory;
+        this.fallback = fallback;
     }
 
     public NotificationResult notify(NotificationRequest request) {
@@ -22,9 +31,30 @@ public class NotificationService {
         }
         NotificationChannel channel = factory.get(request.channel());
         if (!channel.supports(request)) {
-            return NotificationResult.failed(request.channel(), request.recipient(), channel.rejectionReason(request));
+            return tryFallback(request, channel.rejectionReason(request));
         }
         return channel.send(request);
+    }
+
+    /** Вариант 3: резервная отправка, если основной канал отказал. */
+    private NotificationResult tryFallback(NotificationRequest request, String primaryReason) {
+        if (!request.hasFallback() || request.channel() == fallback.channel()) {
+            return NotificationResult.failed(request.channel(), request.recipient(), primaryReason);
+        }
+        NotificationRequest backup = new NotificationRequest(fallback.channel(), request.fallbackRecipient().trim(),
+                request.message());
+        NotificationChannel backupChannel = factory.get(fallback.channel());
+        if (!backupChannel.supports(backup)) {
+            return NotificationResult.failed(request.channel(), request.recipient(), primaryReason
+                    + "; резервный канал: " + backupChannel.rejectionReason(backup));
+        }
+        if (!fallback.tryAcquire()) {
+            return NotificationResult.failed(request.channel(), request.recipient(), primaryReason
+                    + "; лимит резервных отправок (" + fallback.limit() + ") исчерпан");
+        }
+        NotificationResult sent = backupChannel.send(backup);
+        return NotificationResult.sent(sent.channel(), sent.recipient(),
+                "через резервный канал (" + request.channel() + " отказал: " + primaryReason + ")");
     }
 
     /** A1: проверки, общие для всех каналов. */

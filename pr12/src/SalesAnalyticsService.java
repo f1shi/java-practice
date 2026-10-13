@@ -11,8 +11,10 @@ import java.util.stream.Collectors;
  */
 public class SalesAnalyticsService {
 
-    /** Индивидуальный вариант 1: порог крупной сделки = 10 тыс. руб. (сделка с суммой >= 10 000 — крупная). */
+    /** Порог крупной сделки: сделка с суммой >= 10 000 руб. — крупная. */
     public static final double LARGE_DEAL_THRESHOLD = 10_000.0;
+    /** Индивидуальный вариант 3 — дополнительный агрегат: доля выручки от 20 % крупнейших сделок. */
+    public static final int TOP_DEALS_PERCENT = 20;
 
     /** Сортировка «лучшие сверху»: сумма по убыванию, при равенстве — менеджер по алфавиту, затем id. */
     public static final Comparator<Sale> BY_AMOUNT_DESC_THEN_MANAGER =
@@ -71,6 +73,24 @@ public class SalesAnalyticsService {
                 .filter(this::isLarge)
                 .sorted(BY_AMOUNT_DESC_THEN_MANAGER)
                 .toList();
+    }
+
+    /**
+     * Дополнительный агрегат (вариант 3): какую долю общей выручки, в процентах, дают 20 % крупнейших сделок.
+     * Число сделок в верхней группе округляется вверх (из 8 сделок берутся 2). Пустой список или нулевая выручка -> 0.0.
+     */
+    public double topDealsRevenueShare(List<Sale> sales) {
+        double total = sales.stream().mapToDouble(Sale::getAmount).sum();
+        if (total == 0) {
+            return 0.0;
+        }
+        long topCount = (sales.size() * (long) TOP_DEALS_PERCENT + 99) / 100;
+        double topRevenue = sales.stream()
+                .sorted(BY_AMOUNT_DESC_THEN_MANAGER)
+                .limit(topCount)
+                .mapToDouble(Sale::getAmount)
+                .sum();
+        return Math.round(topRevenue / total * 10_000.0) / 100.0;
     }
 
     public boolean isLarge(Sale sale) {

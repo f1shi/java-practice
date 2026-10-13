@@ -18,15 +18,21 @@ public class SelfCheck {
                 expectedWords += i;
             }
         }
-        // 45 успешных, 5 ошибок, слов = сумма i для i не кратных 10
-        for (int pool : new int[]{1, 3, 8, 10}) {
+        // 45 успешных, 5 ошибок, слов = сумма i для i не кратных 10; документов от 20 слов: 21..29, 31..39, 41..49 = 27
+        for (int pool : new int[]{1, 3, 8}) {
             BatchResult r = new BatchProcessor(new DocumentProcessor(2), pool).processAll(docs);
             check("пул " + pool + ": " + r, r.getSuccessCount() == 45 && r.getErrorCount() == 5
-                    && r.getTotalWords() == expectedWords);
+                    && r.getTotalWords() == expectedWords && r.getLargeDocumentCount() == 27);
         }
         BatchResult seq = new BatchProcessor(new DocumentProcessor(0), 1).processSequentially(docs);
         check("последовательный режим даёт те же агрегаты", seq.getSuccessCount() == 45 && seq.getErrorCount() == 5
-                && seq.getTotalWords() == expectedWords);
+                && seq.getTotalWords() == expectedWords && seq.getLargeDocumentCount() == 27);
+
+        // вариант 3: граница «объёмного» документа — 20 слов включительно
+        BatchResult edge = new BatchProcessor(new DocumentProcessor(0), 2).processAll(List.of(
+                new Document("W19", "а ".repeat(19)), new Document("W20", "а ".repeat(20)),
+                new Document("W21", "а ".repeat(21)), new Document("BAD", "")));
+        check("19 слов — нет, 20 и 21 — да, ошибочный не учитывается: " + edge, edge.getLargeDocumentCount() == 2);
 
         // ошибка одного документа не отменяет остальные
         BatchResult one = new BatchProcessor(new DocumentProcessor(0), 4).processAll(List.of(
@@ -39,11 +45,11 @@ public class SelfCheck {
                 new Document("X", "a b"), new Document("X", "c d e")));
         check("дубликат id: 1 успех, 1 ошибка", dup.getSuccessCount() == 1 && dup.getErrorCount() == 1);
 
-        // границы размера пула (вариант 1: 1..10)
+        // границы размера пула: 1..8
         expect("пул 0", () -> new BatchProcessor(new DocumentProcessor(0), 0));
         check("пул 1 допустим", ok(() -> new BatchProcessor(new DocumentProcessor(0), 1)));
-        check("пул 10 допустим", ok(() -> new BatchProcessor(new DocumentProcessor(0), 10)));
-        expect("пул 11", () -> new BatchProcessor(new DocumentProcessor(0), 11));
+        check("пул 8 допустим", ok(() -> new BatchProcessor(new DocumentProcessor(0), 8)));
+        expect("пул 9", () -> new BatchProcessor(new DocumentProcessor(0), 9));
         expect("список null", () -> {
             try {
                 new BatchProcessor(new DocumentProcessor(0), 2).processAll(null);

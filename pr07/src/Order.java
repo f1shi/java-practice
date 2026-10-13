@@ -8,6 +8,13 @@ import java.util.List;
  */
 public class Order {
 
+    /**
+     * Индивидуальный вариант 3 — правило объединения повторного товара (модификатор 20):
+     * повторно добавленный товар объединяется с существующей строкой, только если итоговое количество
+     * не превышает 20; иначе операция отклоняется и строка не меняется.
+     */
+    public static final int MERGE_LIMIT = 20;
+
     private final Employee employee;
     private final List<OrderItem> items = new ArrayList<>();
     private OrderStatus status = OrderStatus.DRAFT;
@@ -26,6 +33,7 @@ public class Order {
         }
         OrderItem existing = findItem(product.getId());
         if (existing != null) {
+            checkMerge(existing, quantity);
             existing.increase(quantity);           // один товар — одна строка
         } else {
             items.add(new OrderItem(product, quantity));
@@ -55,6 +63,16 @@ public class Order {
             throw new IllegalStateException("нельзя подтвердить пустой заказ");
         }
         status = OrderStatus.CONFIRMED;
+    }
+
+    private static void checkMerge(OrderItem existing, int quantity) {
+        OrderItem.checkQuantity(quantity);
+        int merged = existing.getQuantity() + quantity;
+        if (merged > MERGE_LIMIT) {
+            throw new IllegalArgumentException("товар " + existing.getProduct().getId() + " уже есть в заказе ("
+                    + existing.getQuantity() + " шт.); объединение до " + merged + " шт. превышает лимит "
+                    + MERGE_LIMIT + " для повторного добавления");
+        }
     }
 
     private void ensureDraft() {

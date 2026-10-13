@@ -3,16 +3,18 @@ package ru.practice.bonus;
 /**
  * Расчёт премии. Правила:
  * <ul>
- *   <li>KPI &lt; KPI_MIN (60 %) — премии нет; KPI_MIN ≤ KPI &lt; 80 % — 10 % оклада; KPI ≥ 80 % — 20 % оклада;</li>
+ *   <li>KPI &lt; KPI_MIN (50 %) — премии нет; KPI_MIN ≤ KPI &lt; 80 % — 10 % оклада; KPI ≥ 80 % — 20 % оклада;</li>
  *   <li>рейтинг 1–2 — премии нет независимо от KPI; рейтинг 5 — плюс 5 п.п.;</li>
  *   <li>стаж от 3 лет — плюс 2 п.п., от 10 лет — плюс 5 п.п. (надбавки не суммируются);</li>
+ *   <li>итоговая ставка не превышает MAX_BONUS_PERCENT (20 % оклада) — вариант 3;</li>
  *   <li>премия округляется до копеек.</li>
  * </ul>
  */
 public class BonusCalculator {
 
-    /** Индивидуальный вариант 1: граница KPI сдвинута на 10 п.п. — минимальный KPI для премии 60 % (было 50 %). */
-    static final double KPI_MIN = 60.0;
+    static final double KPI_MIN = 50.0;
+    /** Индивидуальный вариант 3: ограничение максимальной премии — не более 20 % оклада. */
+    static final double MAX_BONUS_PERCENT = 20.0;
     static final double KPI_HIGH = 80.0;
     static final double BASE_RATE = 10.0;
     static final double HIGH_RATE = 20.0;
@@ -33,6 +35,7 @@ public class BonusCalculator {
             ratePercent += TOP_RATING_BONUS;
         }
         ratePercent += seniorityBonus(p.getYears());
+        ratePercent = Math.min(ratePercent, MAX_BONUS_PERCENT);
         return Math.round(p.getSalary() * ratePercent) / 100.0;
     }
 
